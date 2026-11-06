@@ -123,3 +123,17 @@ with onglets[4]:
             f"Le plus gros releve de {chwa_ane} est celui de **{t['quartier']}** en {t['mois']} "
             f"({t['kwh']:,} kWh).".replace(",", " ")
         )
+
+
+st.subheader("Conclusion")
+st.markdown(
+    "**La consommation suit les heures de courant, pas la chaleur.** Chez les résidentiels, "
+    "la corrélation avec les heures de courant est de 0,76 (de 0,84 à 0,97 quartier par quartier), "
+    "contre -0,15 avec la température. Ce lien est en partie mécanique (sans courant, pas de "
+    "consommation) et une corrélation ne dit pas ce qui cause quoi : un facteur commun, comme la "
+    "qualité du réseau ou l'activité du quartier, pourrait jouer sur les deux. Elle ne dit pas non "
+    "plus ce qui se passerait si l'on rallongeait les heures de courant."
+)
+ 
+with st.expander("Voir les données filtrées"):
+    st.dataframe(df)
