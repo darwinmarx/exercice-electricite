@@ -40,3 +40,86 @@ if not chwa_komin:
 
 deux_ans = done[done["commune"].isin(chwa_komin)]
 df = deux_ans[deux_ans["annee"] == chwa_ane]
+
+
+
+k1, k2, k3 = st.columns(3)
+k1.metric("Consommation totale", f"{df['kwh'].sum() / 1e6:.2f} millions de kWh")
+k2.metric("Par abonné et par mois", f"{df['kwh_par_abonne'].mean():.1f} kWh")
+k3.metric("Courant par jour", f"{df['heures_courant'].mean():.1f} heures")
+
+
+
+onglets = st.tabs([
+    "Qui consomme le plus ?",
+    "Évolution",
+    "Chaleur ou courant ?",
+    "Coupures",
+    "Relevés atypiques",
+])
+ 
+with onglets[0]:
+    par_quartier = df.groupby("quartier")["kwh_par_abonne"].mean().round(1).sort_values(ascending=False)
+    st.bar_chart(par_quartier)
+    premier = par_quartier.index[0]
+    st.write(
+        f"En {chwa_ane}, **{premier}** consomme le plus par abonné "
+        f"({par_quartier.iloc[0]} kWh par mois)."
+    )
+    par_type = df.groupby("type")["kwh_par_abonne"].mean().round(1)
+    if {"Commercial", "Résidentiel"} <= set(par_type.index):
+        st.write(
+            f"Un abonné commercial consomme en moyenne {par_type['Commercial']} kWh par mois, "
+            f"contre {par_type['Résidentiel']} pour un abonné résidentiel."
+        )
+ 
+with onglets[1]:
+    courbe = deux_ans.groupby(["mois", "commune"]).agg(kwh=("kwh", "sum"), abonnes=("abonnes", "sum"))
+    courbe["par_abonne"] = courbe["kwh"] / courbe["abonnes"]
+    st.line_chart(courbe["par_abonne"].unstack("commune"))
+    totaux = deux_ans.groupby("annee")["kwh"].sum()
+    if 2024 in totaux.index and 2025 in totaux.index:
+        hausse = (totaux[2025] / totaux[2024] - 1) * 100
+        st.write(
+            f"Pour les communes choisies, la consommation passe de {totaux[2024] / 1e6:.2f} "
+            f"à {totaux[2025] / 1e6:.2f} millions de kWh entre 2024 et 2025 ({hausse:+.1f} %)."
+        )
+    st.caption(
+        "Les deux années sont affichées. Sept des neuf relevés manquants sont en 2025 : "
+        "les totaux 2025 sont un peu sous-estimés."
+    )
+ 
+with onglets[2]:
+    res = deux_ans[deux_ans["type"] == "Résidentiel"]
+    if len(res) < 3:
+        st.info("Pas assez de quartiers résidentiels dans ce choix de communes.")
+    else:
+        st.scatter_chart(res, x="heures_courant", y="kwh_par_abonne")
+        r_courant = res["kwh_par_abonne"].corr(res["heures_courant"])
+        r_chaleur = res["kwh_par_abonne"].corr(res["temperature_c"])
+        st.write(
+            f"Quartiers résidentiels : la corrélation de la consommation par abonné est de "
+            f"**{r_courant:.2f}** avec les heures de courant, et de **{r_chaleur:.2f}** avec la température."
+        )
+        st.caption("Les deux années sont affichées.")
+ 
+with onglets[3]:
+    mediane = df.groupby("commune")["heures_courant"].median().round(1)
+    st.bar_chart(mediane)
+    plus_basse = mediane.idxmin()
+    faibles = df[df["heures_courant"] < 8]
+    st.write(
+        f"En {chwa_ane}, la médiane la plus basse est à **{plus_basse}** "
+        f"({mediane.min()} heures de courant par jour). "
+        f"{len(faibles)} relevé(s) ont moins de 8 heures de courant par jour."
+    )
+ 
+with onglets[4]:
+    top = df.nlargest(3, "kwh")[["mois", "quartier", "type", "kwh"]]
+    st.bar_chart(top.assign(releve=top["mois"] + " " + top["quartier"]).set_index("releve")["kwh"])
+    if len(top):
+        t = top.iloc[0]
+        st.write(
+            f"Le plus gros releve de {chwa_ane} est celui de **{t['quartier']}** en {t['mois']} "
+            f"({t['kwh']:,} kWh).".replace(",", " ")
+        )
